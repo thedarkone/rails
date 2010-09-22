@@ -33,5 +33,11 @@ module ActionController
         options.each { |k,v| send("#{k}=", v) }
       end
     end
+
+    config.after_initialize do
+      ActiveSupport.on_load(:action_controller) do
+        config.crystalize! if config.respond_to?(:crystalize!)
+      end
+    end
   end
 end

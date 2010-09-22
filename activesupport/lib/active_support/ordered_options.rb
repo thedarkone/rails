@@ -1,4 +1,5 @@
 require 'active_support/ordered_hash'
+require 'active_support/core_ext/kernel/singleton_class'
 
 # Usually key value pairs are handled something like this:
 #
@@ -31,6 +32,18 @@ module ActiveSupport #:nodoc:
         self[$1.to_sym] = args.first
       else
         self[name]
+      end
+    end
+
+    # compiles reader methods so we don't have to go through method_missing
+    def crystalize!
+      each_key do |key|
+        next if respond_to?(key)
+        singleton_class.class_eval <<-RUBY_EVAL, __FILE__, __LINE__ + 1
+          def #{key}
+            self[#{key.inspect}]
+          end
+        RUBY_EVAL
       end
     end
   end
