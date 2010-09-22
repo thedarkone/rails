@@ -19,6 +19,8 @@ require 'active_support/core_ext/kernel/singleton_class'
 #
 module ActiveSupport #:nodoc:
   class OrderedOptions < OrderedHash
+    alias_method :get, :[]
+
     def []=(key, value)
       super(key.to_sym, value)
     end
@@ -41,7 +43,7 @@ module ActiveSupport #:nodoc:
         next if respond_to?(key)
         singleton_class.class_eval <<-RUBY_EVAL, __FILE__, __LINE__ + 1
           def #{key}
-            self[#{key.inspect}]
+            get(#{key.inspect})
           end
         RUBY_EVAL
       end
