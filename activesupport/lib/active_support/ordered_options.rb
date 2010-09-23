@@ -1,5 +1,4 @@
 require 'active_support/ordered_hash'
-require 'active_support/core_ext/kernel/singleton_class'
 
 # Usually key value pairs are handled something like this:
 #
@@ -19,8 +18,6 @@ require 'active_support/core_ext/kernel/singleton_class'
 #
 module ActiveSupport #:nodoc:
   class OrderedOptions < OrderedHash
-    alias_method :get, :[]
-
     def []=(key, value)
       super(key.to_sym, value)
     end
@@ -36,23 +33,19 @@ module ActiveSupport #:nodoc:
         self[name]
       end
     end
-
-    # compiles reader methods so we don't have to go through method_missing
-    def crystalize!
-      each_key do |key|
-        next if respond_to?(key)
-        singleton_class.class_eval <<-RUBY_EVAL, __FILE__, __LINE__ + 1
-          def #{key}
-            get(#{key.inspect})
-          end
-        RUBY_EVAL
-      end
-    end
   end
 
   class InheritableOptions < OrderedOptions
-    def initialize(parent)
-      super() { |h,k| parent[k] }
+    def initialize(parent = nil)
+      if parent
+        super() {|h,k| parent[k]}
+      else
+        super()
+      end
+    end
+
+    def inheritable_copy
+      self.class.new(self)
     end
   end
 end

@@ -26,6 +26,10 @@ module ActionController
       options.stylesheets_dir      ||= paths.public.stylesheets.to_a.first
       options.page_cache_directory ||= paths.public.to_a.first
 
+      # make sure the readers get compiled
+      options.asset_path           ||= nil
+      options.asset_host           ||= nil
+
       ActiveSupport.on_load(:action_controller) do
         include app.routes.mounted_helpers
         extend ::AbstractController::Railties::RoutesHelpers.with(app.routes)

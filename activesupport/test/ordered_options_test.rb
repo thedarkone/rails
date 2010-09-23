@@ -50,18 +50,4 @@ class OrderedOptionsTest < Test::Unit::TestCase
     assert_equal 2, a.size
     assert_equal 56, a.else_where
   end
-
-  def test_crystalize
-    a = ActiveSupport::OrderedOptions.new
-
-    a.allow_concurency = true
-    assert !a.respond_to?(:allow_concurency)
-
-    a.crystalize!
-
-    assert_respond_to a, :allow_concurency
-    assert_equal a.allow_concurency, true
-
-    assert !ActiveSupport::OrderedOptions.new.respond_to?(:allow_concurency)
-  end
 end
