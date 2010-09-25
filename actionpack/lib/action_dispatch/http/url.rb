@@ -15,12 +15,12 @@ module ActionDispatch
 
       # Returns 'https://' if this is an SSL request and 'http://' otherwise.
       def protocol
-        ssl? ? 'https://' : 'http://'
+        @protocol ||= ssl? ? 'https://' : 'http://'
       end
 
       # Is this an SSL request?
       def ssl?
-        @env['HTTPS'] == 'on' || @env['HTTP_X_FORWARDED_PROTO'] == 'https'
+        @ssl ||= @env['HTTPS'] == 'on' || @env['HTTP_X_FORWARDED_PROTO'] == 'https'
       end
 
       # Returns the \host for this request, such as "example.com".
@@ -40,7 +40,7 @@ module ActionDispatch
       # Returns a \host:\port string for this request, such as "example.com" or
       # "example.com:8080".
       def host_with_port
-        "#{host}#{port_string}"
+        @host_with_port ||= "#{host}#{port_string}"
       end
 
       # Returns the port number of this request as an integer.
