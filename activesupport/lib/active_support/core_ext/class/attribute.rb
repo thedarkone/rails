@@ -99,13 +99,12 @@ class Class
 
   private
   def singleton_class?
-    if kind_of?(Class)
-      begin
-        allocate
-        false
-      rescue TypeError
-        true
-      end
-    end
+    # in case somebody is crazy enough to overwrite allocate
+    allocate = Class.instance_method(:allocate)
+    # object.class always points to a real (non-singleton) class
+    allocate.bind(self).call.class != self
+  rescue TypeError
+    # MRI/YARV/JRuby all disallow creating new instances of a singleton class
+    true
   end
 end
