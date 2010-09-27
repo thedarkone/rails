@@ -10,15 +10,15 @@ module ActiveSupport
     extend ActiveSupport::Concern
 
     class Configuration < ActiveSupport::InheritableOptions
-      def crystalize!
-        self.class.crystalize!(keys.reject {|key| respond_to?(key)})
+      def method_missing(name, *args)
+        super.tap { self.class.crystalize!(name) unless name.to_s.ends_with?('=') }
       end
 
       # compiles reader methods so we don't have to go through method_missing
-      def self.crystalize!(keys)
-        keys.each do |key|
+      def self.crystalize!(*keys)
+        keys.flatten.each do |key|
           class_eval <<-RUBY, __FILE__, __LINE__ + 1
-            def #{key}; _get(#{key.inspect}); end
+            def #{key}; _get(#{key.to_sym.inspect}); end
           RUBY
         end
       end

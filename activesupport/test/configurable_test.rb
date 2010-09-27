@@ -49,7 +49,6 @@ class ConfigurableActiveSupport < ActiveSupport::TestCase
     assert !child.config.respond_to?(:bar)
     assert !child.new.config.respond_to?(:bar)
 
-    parent.config.crystalize!
     assert_equal :foo, parent.config.bar
     assert_equal :foo, child.new.config.bar
 
