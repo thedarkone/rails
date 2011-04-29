@@ -138,6 +138,10 @@ class DurationTest < ActiveSupport::TestCase
     assert_equal counter, 60
   end
 
+  def test_duplicable
+    assert_equal false, 5.seconds.duplicable?
+  end
+
   protected
     def with_env_tz(new_tz = 'US/Eastern')
       old_tz, ENV['TZ'] = ENV['TZ'], new_tz
