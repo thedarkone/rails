@@ -1,6 +1,9 @@
 module ActionView
   module CompiledTemplates #:nodoc:
     # holds compiled template code
+    class << self
+      alias_method :compile_template, :module_eval
+    end
   end
 
   # = Action View Context

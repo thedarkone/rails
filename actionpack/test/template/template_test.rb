@@ -11,6 +11,8 @@ class TestERBTemplate < ActiveSupport::TestCase
   end
 
   class Context
+    include ActionView::CompiledTemplates
+    
     def initialize
       @output_buffer = "original"
       @virtual_path = nil
