@@ -279,7 +279,7 @@ module ActionView
         end
 
         begin
-          mod.module_eval(source, identifier, 0)
+          mod.compile_template(source, identifier, 0)
           ObjectSpace.define_finalizer(self, Finalizer[method_name, mod])
         rescue Exception => e # errors from template code
           if logger = (view && view.logger)
