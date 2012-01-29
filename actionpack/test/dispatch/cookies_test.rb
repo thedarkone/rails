@@ -148,6 +148,22 @@ class CookiesTest < ActionController::TestCase
     @request.host = "www.nextangle.com"
   end
 
+  def test_each
+    request.cookie_jar['foo'] = :bar
+    list = []
+    request.cookie_jar.each do |k,v|
+      list << [k, v]
+    end
+
+    assert_equal [['foo', :bar]], list
+  end
+
+  def test_enumerable
+    request.cookie_jar['foo'] = :bar
+    actual = request.cookie_jar.map { |k,v| [k.to_s, v.to_s] }
+    assert_equal [['foo', 'bar']], actual
+  end
+
   def test_key_methods
     assert !request.cookie_jar.key?(:foo)
     assert !request.cookie_jar.has_key?("foo")
@@ -425,18 +441,15 @@ class CookiesTest < ActionController::TestCase
     assert_response :success
     assert_cookie_header "user_name=; path=/; expires=Thu, 01-Jan-1970 00:00:00 GMT"
   end
-
   
   def test_cookies_hash_is_indifferent_access
-      get :symbol_key
-      assert_equal "david", cookies[:user_name]
-      assert_equal "david", cookies['user_name']
-      get :string_key
-      assert_equal "dhh", cookies[:user_name]
-      assert_equal "dhh", cookies['user_name']
+    get :symbol_key
+    assert_equal "david", cookies[:user_name]
+    assert_equal "david", cookies['user_name']
+    get :string_key
+    assert_equal "dhh", cookies[:user_name]
+    assert_equal "dhh", cookies['user_name']
   end
-
-
 
   def test_setting_request_cookies_is_indifferent_access
     @request.cookies.clear

@@ -91,10 +91,22 @@ module ActiveRecord
         assert_equal [:remove_index, [:table, {:column => [:one, :two]}]], remove
       end
 
+      def test_invert_add_index_with_name
+          @recorder.record :add_index, [:table, [:one, :two], {:name => "new_index"}]
+          remove = @recorder.inverse.first
+          assert_equal [:remove_index, [:table, {:name => "new_index"}]], remove
+      end
+
+      def test_invert_add_index_with_no_options
+        @recorder.record :add_index, [:table, [:one, :two]]
+        remove = @recorder.inverse.first
+        assert_equal [:remove_index, [:table, {:column => [:one, :two]}]], remove
+      end
+
       def test_invert_rename_index
-        @recorder.record :rename_index, [:old, :new]
+        @recorder.record :rename_index, [:table, :old, :new]
         rename = @recorder.inverse.first
-        assert_equal [:rename_index, [:new, :old]], rename
+        assert_equal [:rename_index, [:table, :new, :old]], rename
       end
 
       def test_invert_add_timestamps

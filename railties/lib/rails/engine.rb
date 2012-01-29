@@ -352,6 +352,7 @@ module Rails
       end
 
       def endpoint(endpoint = nil)
+        @endpoint ||= nil
         @endpoint = endpoint if endpoint
         @endpoint
       end
@@ -484,7 +485,7 @@ module Rails
     # Blog::Engine.load_seed
     def load_seed
       seed_file = paths["db/seeds"].existent.first
-      load(seed_file) if File.exist?(seed_file)
+      load(seed_file) if seed_file && File.exist?(seed_file)
     end
 
     # Add configured load paths to ruby load paths and remove duplicates.
@@ -533,12 +534,12 @@ module Rails
       end
     end
 
-    initializer :load_environment_config, :before => :load_environment_hook do
+    initializer :load_environment_config, :before => :load_environment_hook, :group => :all do
       environment = paths["config/environments"].existent.first
       require environment if environment
     end
 
-    initializer :append_assets_path do |app|
+    initializer :append_assets_path, :group => :all do |app|
       app.config.assets.paths.unshift(*paths["vendor/assets"].existent_directories)
       app.config.assets.paths.unshift(*paths["lib/assets"].existent_directories)
       app.config.assets.paths.unshift(*paths["app/assets"].existent_directories)

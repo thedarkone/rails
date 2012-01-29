@@ -8,6 +8,9 @@ class TestERBTemplate < ActiveSupport::TestCase
     def disable_cache
       yield
     end
+
+    def find_template(*args)
+    end
   end
 
   class Context
@@ -155,7 +158,6 @@ class TestERBTemplate < ActiveSupport::TestCase
     def test_encoding_can_be_specified_with_magic_comment_in_erb
       with_external_encoding Encoding::UTF_8 do
         @template = new_template("<%# encoding: ISO-8859-1 %>hello \xFCmlat", :virtual_path => nil)
-        result = render
         assert_equal Encoding::UTF_8, render.encoding
         assert_equal "hello \u{fc}mlat", render
       end
@@ -170,6 +172,7 @@ class TestERBTemplate < ActiveSupport::TestCase
 
     def with_external_encoding(encoding)
       old = Encoding.default_external
+      Encoding::Converter.new old, encoding if old != encoding
       silence_warnings { Encoding.default_external = encoding }
       yield
     ensure

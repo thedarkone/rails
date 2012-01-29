@@ -9,7 +9,7 @@ require 'uri'
 module Rails
   module Generators
     class AppBase < Base
-      DATABASES = %w( mysql oracle postgresql sqlite3 frontbase ibm_db )
+      DATABASES = %w( mysql oracle postgresql sqlite3 frontbase ibm_db sqlserver )
       JDBC_DATABASES = %w( jdbcmysql jdbcsqlite3 jdbcpostgresql jdbc )
       DATABASES.concat(JDBC_DATABASES)
 
@@ -131,7 +131,7 @@ module Rails
       end
 
       def comment_if(value)
-        options[value] ? '#' : ''
+        options[value] ? '# ' : ''
       end
 
       def rails_gemfile_entry
@@ -154,12 +154,13 @@ module Rails
       end
 
       def gem_for_database
-        # %w( mysql oracle postgresql sqlite3 frontbase ibm_db jdbcmysql jdbcsqlite3 jdbcpostgresql )
+        # %w( mysql oracle postgresql sqlite3 frontbase ibm_db sqlserver jdbcmysql jdbcsqlite3 jdbcpostgresql )
         case options[:database]
         when "oracle"     then "ruby-oci8"
         when "postgresql" then "pg"
         when "frontbase"  then "ruby-frontbase"
         when "mysql"      then "mysql2"
+        when "sqlserver"  then "activerecord-sqlserver-adapter"
         when "jdbcmysql"      then "activerecord-jdbcmysql-adapter"
         when "jdbcsqlite3"    then "activerecord-jdbcsqlite3-adapter"
         when "jdbcpostgresql" then "activerecord-jdbcpostgresql-adapter"
@@ -189,29 +190,44 @@ module Rails
 
       def turn_gemfile_entry
         unless RUBY_VERSION < "1.9.2" || options[:skip_test_unit]
+          version = RUBY_VERSION >= "1.9.3" ? "'~> 0.8.3'" : "'0.8.2'"
           <<-GEMFILE.strip_heredoc
             group :test do
               # Pretty printed test output
-              gem 'turn', :require => false
+              gem 'turn', #{version}, :require => false
             end
           GEMFILE
         end
+      end
+
+      def assets_gemfile_entry
+        return if options[:skip_sprockets]
+        gemfile = <<-GEMFILE.strip_heredoc
+          # Gems used only for assets and not required
+          # in production environments by default.
+          group :assets do
+            gem 'sass-rails', #{options.dev? || options.edge? ? "  :git => 'git://github.com/rails/sass-rails.git', :branch => '3-1-stable'" : "  '~> 3.1.5'"}
+            gem 'coffee-rails', #{options.dev? || options.edge? ? ":git => 'git://github.com/rails/coffee-rails.git', :branch => '3-1-stable'" : "'~> 3.1.1'"}
+
+            # See https://github.com/sstephenson/execjs#readme for more supported runtimes
+            #{javascript_runtime_gemfile_entry}
+            gem 'uglifier', '>= 1.0.3'
+          end
+        GEMFILE
+
+        gemfile.strip_heredoc.gsub(/^[ \t]*$/, '')
       end
 
       def javascript_gemfile_entry
         "gem '#{options[:javascript]}-rails'" unless options[:skip_javascript]
       end
 
-      def assets_gemfile_entry
-        <<-GEMFILE.strip_heredoc
-          # Gems used only for assets and not required
-          # in production environments by default.
-          group :assets do
-            gem 'sass-rails', #{options.dev? || options.edge? ? "  :git => 'git://github.com/rails/sass-rails.git', :branch => '3-1-stable'" : "  ~> 3.1.0.rc".inspect}
-            gem 'coffee-rails', #{options.dev? || options.edge? ? ":git => 'git://github.com/rails/coffee-rails.git', :branch => '3-1-stable'" : "~> 3.1.0.rc".inspect}
-            gem 'uglifier'
-          end
-        GEMFILE
+      def javascript_runtime_gemfile_entry
+        if defined?(JRUBY_VERSION)
+          "gem 'therubyrhino'\n"
+        else
+          "# gem 'therubyracer'\n"
+        end
       end
 
       def bundle_command(command)

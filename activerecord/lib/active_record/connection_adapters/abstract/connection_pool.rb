@@ -314,7 +314,7 @@ module ActiveRecord
       end
 
       def current_connection_id #:nodoc:
-        Thread.current.object_id
+        ActiveRecord::Base.connection_id ||= Thread.current.object_id
       end
 
       def checkout_new_connection
@@ -421,7 +421,7 @@ module ActiveRecord
       # can be used as an argument for establish_connection, for easily
       # re-establishing the connection.
       def remove_connection(klass)
-        pool = @connection_pools[klass.name]
+        pool = @connection_pools.delete(klass.name)
         return nil unless pool
 
         pool.automatic_reconnect = false

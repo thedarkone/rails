@@ -458,7 +458,9 @@ module ActionDispatch
                 prefix_options = options.slice(*_route.segment_keys)
                 # we must actually delete prefix segment keys to avoid passing them to next url_for
                 _route.segment_keys.each { |k| options.delete(k) }
-                _routes.url_helpers.send("#{name}_path", prefix_options)
+                prefix = _routes.url_helpers.send("#{name}_path", prefix_options)
+                prefix = '' if prefix == '/'
+                prefix
               end
             end
           end
@@ -700,7 +702,7 @@ module ActionDispatch
         # Allows you to constrain the nested routes based on a set of rules.
         # For instance, in order to change the routes to allow for a dot character in the +id+ parameter:
         #
-        #   constraints(:id => /\d+\.\d+) do
+        #   constraints(:id => /\d+\.\d+/) do
         #     resources :posts
         #   end
         #
@@ -710,7 +712,7 @@ module ActionDispatch
         # You may use this to also restrict other parameters:
         #
         #   resources :posts do
-        #     constraints(:post_id => /\d+\.\d+) do
+        #     constraints(:post_id => /\d+\.\d+/) do
         #       resources :comments
         #     end
         #   end
@@ -739,7 +741,7 @@ module ActionDispatch
         # if the user should be given access to that route, or +false+ if the user should not.
         #
         #    class Iphone
-        #      def self.matches(request)
+        #      def self.matches?(request)
         #        request.env["HTTP_USER_AGENT"] =~ /iPhone/
         #      end
         #    end

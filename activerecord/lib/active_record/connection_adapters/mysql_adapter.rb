@@ -2,6 +2,7 @@ require 'active_record/connection_adapters/abstract_adapter'
 require 'active_support/core_ext/kernel/requires'
 require 'active_support/core_ext/object/blank'
 require 'set'
+require 'active_record/connection_adapters/statement_pool'
 
 gem 'mysql', '~> 2.8.1'
 require 'mysql'
@@ -184,11 +185,45 @@ module ActiveRecord
         :boolean     => { :name => "tinyint", :limit => 1 }
       }
 
+      class StatementPool < ConnectionAdapters::StatementPool
+        def initialize(connection, max = 1000)
+          super
+          @cache = Hash.new { |h,pid| h[pid] = {} }
+        end
+
+        def each(&block); cache.each(&block); end
+        def key?(key);    cache.key?(key); end
+        def [](key);      cache[key]; end
+        def length;       cache.length; end
+        def delete(key);  cache.delete(key); end
+
+        def []=(sql, key)
+          while @max <= cache.size
+            cache.shift.last[:stmt].close
+          end
+          cache[sql] = key
+        end
+
+        def clear
+          cache.values.each do |hash|
+            hash[:stmt].close
+          end
+          cache.clear
+        end
+
+        private
+        def cache
+          @cache[$$]
+        end
+      end
+
       def initialize(connection, logger, connection_options, config)
         super(connection, logger)
         @connection_options, @config = connection_options, config
         @quoted_column_names, @quoted_table_names = {}, {}
         @statements = {}
+        @statements = StatementPool.new(@connection,
+                                        config.fetch(:statement_limit) { 1000 })
         @client_encoding = nil
         connect
       end
@@ -251,7 +286,7 @@ module ActiveRecord
       end
 
       def quote_column_name(name) #:nodoc:
-        @quoted_column_names[name] ||= "`#{name}`"
+        @quoted_column_names[name] ||= "`#{name.to_s.gsub('`', '``')}`"
       end
 
       def quote_table_name(name) #:nodoc:
@@ -334,9 +369,6 @@ module ActiveRecord
 
       # Clears the prepared statements cache.
       def clear_cache!
-        @statements.values.each do |cache|
-          cache[:stmt].close
-        end
         @statements.clear
       end
 
@@ -504,6 +536,27 @@ module ActiveRecord
         sql
       end
       deprecate :add_limit_offset!
+
+      # In the simple case, MySQL allows us to place JOINs directly into the UPDATE
+      # query. However, this does not allow for LIMIT, OFFSET and ORDER. To support
+      # these, we must use a subquery. However, MySQL is too stupid to create a
+      # temporary table for this automatically, so we have to give it some prompting
+      # in the form of a subsubquery. Ugh!
+      def join_to_update(update, select) #:nodoc:
+        if select.limit || select.offset || select.orders.any?
+          subsubselect = select.clone
+          subsubselect.projections = [update.key]
+
+          subselect = Arel::SelectManager.new(select.engine)
+          subselect.project Arel.sql(update.key.name)
+          subselect.from subsubselect.as('__active_record_temp')
+
+          update.where update.key.in(subselect)
+        else
+          update.table select.source
+          update.wheres = select.constraints
+        end
+      end
 
       # SCHEMA STATEMENTS ========================================
 
@@ -702,13 +755,16 @@ module ActiveRecord
 
       # Returns a table's primary key and belonging sequence.
       def pk_and_sequence_for(table) #:nodoc:
-        keys = []
-        result = execute("describe #{quote_table_name(table)}", 'SCHEMA')
-        result.each_hash do |h|
-          keys << h["Field"]if h["Key"] == "PRI"
-        end
+        result = execute("SHOW CREATE TABLE #{quote_table_name(table)}", 'SCHEMA')
+        create_table = result.fetch_hash["Create Table"]
         result.free
-        keys.length == 1 ? [keys.first, nil] : nil
+
+        if create_table.to_s =~ /PRIMARY KEY\s+\((.+)\)/
+          keys = $1.split(",").map { |key| key.gsub(/`/, "") }
+          keys.length == 1 ? [keys.first, nil] : nil
+        else
+          nil
+        end
       end
 
       # Returns just a table's primary key
@@ -734,7 +790,7 @@ module ActiveRecord
         def quoted_columns_for_index(column_names, options = {})
           length = options[:length] if options.is_a?(Hash)
 
-          quoted_column_names = case length
+          case length
           when Hash
             column_names.map {|name| length[name] ? "#{quote_column_name(name)}(#{length[name]})" : quote_column_name(name) }
           when Fixnum

@@ -116,8 +116,8 @@ module ActiveRecord #:nodoc:
   # When joining tables, nested hashes or keys written in the form 'table_name.column_name'
   # can be used to qualify the table name of a particular condition. For instance:
   #
-  #   Student.joins(:schools).where(:schools => { :type => 'public' })
-  #   Student.joins(:schools).where('schools.type' => 'public' )
+  #   Student.joins(:schools).where(:schools => { :category => 'public' })
+  #   Student.joins(:schools).where('schools.category' => 'public' )
   #
   # == Overwriting default accessors
   #
@@ -622,6 +622,8 @@ module ActiveRecord #:nodoc:
 
       # Computes the table name, (re)sets it internally, and returns it.
       def reset_table_name #:nodoc:
+        return if abstract_class?
+
         self.table_name = compute_table_name
       end
 
@@ -703,6 +705,10 @@ module ActiveRecord #:nodoc:
 
       # Returns an array of column objects for the table associated with this class.
       def columns
+        if defined?(@primary_key)
+          connection_pool.primary_keys[table_name] ||= primary_key
+        end
+
         connection_pool.columns[table_name]
       end
 
@@ -750,7 +756,7 @@ module ActiveRecord #:nodoc:
       # values, eg:
       #
       #  class CreateJobLevels < ActiveRecord::Migration
-      #    def self.up
+      #    def up
       #      create_table :job_levels do |t|
       #        t.integer :id
       #        t.string :name
@@ -764,7 +770,7 @@ module ActiveRecord #:nodoc:
       #      end
       #    end
       #
-      #    def self.down
+      #    def down
       #      drop_table :job_levels
       #    end
       #  end
@@ -1270,27 +1276,43 @@ MSG
           self.default_scopes = default_scopes + [scope]
         end
 
-        # The @ignore_default_scope flag is used to prevent an infinite recursion situation where
-        # a default scope references a scope which has a default scope which references a scope...
         def build_default_scope #:nodoc:
-          return if defined?(@ignore_default_scope) && @ignore_default_scope
-          @ignore_default_scope = true
-
           if method(:default_scope).owner != Base.singleton_class
-            default_scope
+            evaluate_default_scope { default_scope }
           elsif default_scopes.any?
-            default_scopes.inject(relation) do |default_scope, scope|
-              if scope.is_a?(Hash)
-                default_scope.apply_finder_options(scope)
-              elsif !scope.is_a?(Relation) && scope.respond_to?(:call)
-                default_scope.merge(scope.call)
-              else
-                default_scope.merge(scope)
+            evaluate_default_scope do
+              default_scopes.inject(relation) do |default_scope, scope|
+                if scope.is_a?(Hash)
+                  default_scope.apply_finder_options(scope)
+                elsif !scope.is_a?(Relation) && scope.respond_to?(:call)
+                  default_scope.merge(scope.call)
+                else
+                  default_scope.merge(scope)
+                end
               end
             end
           end
-        ensure
-          @ignore_default_scope = false
+        end
+
+        def ignore_default_scope? #:nodoc:
+          Thread.current["#{self}_ignore_default_scope"]
+        end
+
+        def ignore_default_scope=(ignore) #:nodoc:
+          Thread.current["#{self}_ignore_default_scope"] = ignore
+        end
+
+        # The ignore_default_scope flag is used to prevent an infinite recursion situation where
+        # a default scope references a scope which has a default scope which references a scope...
+        def evaluate_default_scope
+          return if ignore_default_scope?
+
+          begin
+            self.ignore_default_scope = true
+            yield
+          ensure
+            self.ignore_default_scope = false
+          end
         end
 
         # Returns the class type of the record using the current module as a prefix. So descendants of
@@ -2148,18 +2170,18 @@ MSG
     include AutosaveAssociation, NestedAttributes
     include Aggregations, Transactions, Reflection, Serialization
 
-    NilClass.add_whiner(self) if NilClass.respond_to?(:add_whiner)
-
     # Returns the value of the attribute identified by <tt>attr_name</tt> after it has been typecast (for example,
     # "2004-12-12" in a data column is cast to a date object, like Date.new(2004, 12, 12)).
     # (Alias for the protected read_attribute method).
-    alias [] read_attribute
+    def [](attr_name)
+      read_attribute(attr_name)
+    end
 
     # Updates the attribute identified by <tt>attr_name</tt> with the specified +value+.
     # (Alias for the protected write_attribute method).
-    alias []= write_attribute
-
-    public :[], :[]=
+    def []=(attr_name, value)
+      write_attribute(attr_name, value)
+    end
   end
 end
 

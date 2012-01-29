@@ -79,6 +79,19 @@ module ActiveModel
       @messages = ActiveSupport::OrderedHash.new
     end
 
+    def initialize_dup(other)
+      @messages = other.messages.dup
+    end
+
+    # Backport dup from 1.9 so that #initialize_dup gets called
+    unless Object.respond_to?(:initialize_dup)
+      def dup # :nodoc:
+        copy = super
+        copy.initialize_dup(self)
+        copy
+      end
+    end
+
     # Clear the messages
     def clear
       messages.clear
@@ -99,6 +112,11 @@ module ActiveModel
       messages[key] = value
     end
 
+    # Delete messages for +key+
+    def delete(key)
+      messages.delete(key)
+    end
+
     # When passed a symbol or a name of a method, returns an array of errors
     # for the method.
     #
@@ -113,7 +131,7 @@ module ActiveModel
     #   p.errors[:name] = "must be set"
     #   p.errors[:name] # => ['must be set']
     def []=(attribute, error)
-      self[attribute.to_sym] << error
+      self[attribute] << error
     end
 
     # Iterates through each error key, value pair in the error messages hash.
@@ -174,7 +192,7 @@ module ActiveModel
       to_a.size
     end
 
-    # Returns true if there are any errors, false if not.
+    # Returns true if no errors are found, false otherwise.
     def empty?
       all? { |k, v| v && v.empty? }
     end

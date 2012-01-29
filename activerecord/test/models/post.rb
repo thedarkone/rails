@@ -36,6 +36,10 @@ class Post < ActiveRecord::Base
     def find_most_recent
       find(:first, :order => "id DESC")
     end
+
+    def the_association
+      proxy_association
+    end
   end
 
   has_many :author_favorites, :through => :author
@@ -167,4 +171,14 @@ class PostWithDefaultInclude < ActiveRecord::Base
   self.table_name = 'posts'
   default_scope includes(:comments)
   has_many :comments, :foreign_key => :post_id
+end
+
+class PostWithDefaultScope < ActiveRecord::Base
+  self.table_name = 'posts'
+  default_scope :order => :title
+end
+
+class SpecialPostWithDefaultScope < ActiveRecord::Base
+  self.table_name = 'posts'
+  default_scope where(:id => [1, 5,6])
 end

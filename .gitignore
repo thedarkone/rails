@@ -1,11 +1,13 @@
 pkg
 .bundle
 Gemfile.lock
+.Gemfile
 debug.log
 doc/rdoc
 activemodel/doc
 activeresource/doc
 activerecord/doc
+activerecord/sqlnet.log
 actionpack/doc
 actionmailer/doc
 activesupport/doc
@@ -21,4 +23,5 @@ railties/doc
 railties/guides/output
 railties/tmp
 .rvmrc
+.rbenv-version
 RDOC_MAIN.rdoc

@@ -55,6 +55,11 @@ module Rails
 
     delegate :default_url_options, :default_url_options=, :to => :routes
 
+    def initialize
+      super
+      @initialized = false
+    end
+
     # This method is called just after an application inherits from Rails::Application,
     # allowing the developer to load classes in lib and use them during application
     # configuration.
@@ -78,7 +83,6 @@ module Rails
       require environment if environment
     end
 
-
     def reload_routes!
       routes_reloader.reload!
     end
@@ -87,9 +91,9 @@ module Rails
       @routes_reloader ||= RoutesReloader.new
     end
 
-    def initialize!
+    def initialize!(group=:default)
       raise "Application has been already initialized." if @initialized
-      run_initializers(self)
+      run_initializers(group, self)
       @initialized = true
       self
     end
@@ -134,6 +138,11 @@ module Rails
       self
     end
 
+    def call(env)
+      env["ORIGINAL_FULLPATH"] = build_original_fullpath(env)
+      super(env)
+    end
+
   protected
 
     alias :build_middleware_stack :app
@@ -147,7 +156,7 @@ module Rails
 
         if config.force_ssl
           require "rack/ssl"
-          middleware.use ::Rack::SSL
+          middleware.use ::Rack::SSL, config.ssl_options
         end
 
         if config.serve_static_assets
@@ -166,6 +175,9 @@ module Rails
         middleware.use ::ActionDispatch::Cookies
 
         if config.session_store
+          if config.force_ssl && !config.session_options.key?(:secure)
+            config.session_options[:secure] = true
+          end
           middleware.use config.session_store, config.session_options
           middleware.use ::ActionDispatch::Flash
         end
@@ -199,6 +211,18 @@ module Rails
       require "pp"
       require "rails/console/app"
       require "rails/console/helpers"
+    end
+
+    def build_original_fullpath(env)
+      path_info    = env["PATH_INFO"]
+      query_string = env["QUERY_STRING"]
+      script_name  = env["SCRIPT_NAME"]
+
+      if query_string.present?
+        "#{script_name}#{path_info}?#{query_string}"
+      else
+        "#{script_name}#{path_info}"
+      end
     end
   end
 end

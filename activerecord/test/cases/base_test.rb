@@ -23,6 +23,7 @@ require 'models/edge'
 require 'models/joke'
 require 'rexml/document'
 require 'active_support/core_ext/exception'
+require 'bcrypt'
 
 class Category < ActiveRecord::Base; end
 class Categorization < ActiveRecord::Base; end
@@ -55,6 +56,29 @@ class Boolean < ActiveRecord::Base; end
 
 class BasicsTest < ActiveRecord::TestCase
   fixtures :topics, :companies, :developers, :projects, :computers, :accounts, :minimalistics, 'warehouse-things', :authors, :categorizations, :categories, :posts
+
+  def test_column_names_are_escaped
+    conn      = ActiveRecord::Base.connection
+    classname = conn.class.name[/[^:]*$/]
+    badchar   = {
+      'SQLite3Adapter'    => '"',
+      'MysqlAdapter'      => '`',
+      'Mysql2Adapter'     => '`',
+      'PostgreSQLAdapter' => '"',
+      'OracleAdapter'     => '"',
+    }.fetch(classname) {
+      raise "need a bad char for #{classname}"
+    }
+
+    quoted = conn.quote_column_name "foo#{badchar}bar"
+    if current_adapter?(:OracleAdapter)
+      # Oracle does not allow double quotes in table and column names at all
+      # therefore quoting removes them
+      assert_equal("#{badchar}foobar#{badchar}", quoted)
+    else
+      assert_equal("#{badchar}foo#{badchar * 2}bar#{badchar}", quoted)
+    end
+  end
 
   def test_columns_should_obey_set_primary_key
     pk = Subscriber.columns.find { |x| x.name == 'nick' }
@@ -1607,6 +1631,10 @@ class BasicsTest < ActiveRecord::TestCase
     assert !LooseDescendant.abstract_class?
   end
 
+  def test_abstract_class_table_name
+    assert_nil AbstractCompany.table_name
+  end
+
   def test_base_class
     assert_equal LoosePerson,     LoosePerson.base_class
     assert_equal LooseDescendant, LooseDescendant.base_class
@@ -1806,21 +1834,41 @@ class BasicsTest < ActiveRecord::TestCase
   end
 
   def test_marshal_round_trip
+    if ENV['TRAVIS'] && RUBY_VERSION == "1.8.7"
+      return skip("Marshalling tests disabled for Ruby 1.8.7 on Travis CI due to what appears " \
+                  "to be a Ruby bug.")
+    end
+
     expected = posts(:welcome)
-    actual   = Marshal.load(Marshal.dump(expected))
+    marshalled = Marshal.dump(expected)
+    actual   = Marshal.load(marshalled)
 
     assert_equal expected.attributes, actual.attributes
   end
 
   def test_marshal_new_record_round_trip
-    post = Marshal.load(Marshal.dump(Post.new))
+    if ENV['TRAVIS'] && RUBY_VERSION == "1.8.7"
+      return skip("Marshalling tests disabled for Ruby 1.8.7 on Travis CI due to what appears " \
+                  "to be a Ruby bug.")
+    end
+
+    marshalled = Marshal.dump(Post.new)
+    post       = Marshal.load(marshalled)
+
     assert post.new_record?, "should be a new record"
   end
 
   def test_marshalling_with_associations
+    if ENV['TRAVIS'] && RUBY_VERSION == "1.8.7"
+      return skip("Marshalling tests disabled for Ruby 1.8.7 on Travis CI due to what appears " \
+                  "to be a Ruby bug.")
+    end
+
     post = Post.new
     post.comments.build
-    post = Marshal.load(Marshal.dump(post))
+
+    marshalled = Marshal.dump(post)
+    post       = Marshal.load(marshalled)
 
     assert_equal 1, post.comments.length
   end
@@ -1860,6 +1908,6 @@ class BasicsTest < ActiveRecord::TestCase
   def test_cache_key_format_for_existing_record_with_nil_updated_at
     dev = Developer.first
     dev.update_attribute(:updated_at, nil)
-    assert_match /\/#{dev.id}$/, dev.cache_key
+    assert_match(/\/#{dev.id}$/, dev.cache_key)
   end
 end

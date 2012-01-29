@@ -37,6 +37,35 @@ module ActiveRecord
       relation
     end
 
+    # Works in two unique ways.
+    # 
+    # First: takes a block so it can be used just like Array#select.
+    #
+    #   Model.scoped.select { |m| m.field == value }
+    #
+    # This will build an array of objects from the database for the scope,
+    # converting them into an array and iterating through them using Array#select.
+    #
+    # Second: Modifies the SELECT statement for the query so that only certain
+    # fields are retrieved:
+    #
+    #   >> Model.select(:field)
+    #   => [#<Model field:value>]
+    #
+    # Although in the above example it looks as though this method returns an
+    # array, it actually returns a relation object and can have other query
+    # methods appended to it, such as the other methods in ActiveRecord::QueryMethods.
+    #
+    # This method will also take multiple parameters:
+    #
+    #   >> Model.select(:field, :other_field, :and_one_more)
+    #   => [#<Model field: "value", other_field: "value", and_one_more: "value">]
+    #
+    # Any attributes that do not have fields retrieved by a select
+    # will return `nil` when the getter method for that attribute is used:
+    #
+    #   >> Model.select(:field).first.other_field
+    #   => nil
     def select(value = Proc.new)
       if block_given?
         to_a.select {|*block_args| value.call(*block_args) }
@@ -254,22 +283,18 @@ module ActiveRecord
 
       association_joins         = buckets['association_join'] || []
       stashed_association_joins = buckets['stashed_join'] || []
-      join_nodes                = buckets['join_node'] || []
+      join_nodes                = (buckets['join_node'] || []).uniq
       string_joins              = (buckets['string_join'] || []).map { |x|
         x.strip
       }.uniq
 
-      join_list = custom_join_ast(manager, string_joins)
+      join_list = join_nodes + custom_join_ast(manager, string_joins)
 
       join_dependency = ActiveRecord::Associations::JoinDependency.new(
         @klass,
         association_joins,
         join_list
       )
-
-      join_nodes.each do |join|
-        join_dependency.alias_tracker.aliased_name_for(join.left.name.downcase)
-      end
 
       join_dependency.graft(*stashed_association_joins)
 
@@ -280,7 +305,6 @@ module ActiveRecord
         association.join_to(manager)
       end
 
-      manager.join_sources.concat join_nodes.uniq
       manager.join_sources.concat join_list
 
       manager
