@@ -154,7 +154,7 @@ module ActiveRecord
       def association_klass(reflection, record)
         if reflection.macro == :belongs_to && reflection.options[:polymorphic]
           klass = record.send(reflection.foreign_type)
-          klass && klass.constantize
+          klass.presence && klass.constantize
         else
           reflection.klass
         end
