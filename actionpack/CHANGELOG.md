@@ -1,3 +1,7 @@
+## Rails 3.1.7 (Jul 26, 2012)
+
+* Do not convert digest auth strings to symbols. CVE-2012-3424
+
 ## Rails 3.1.6 (Jun 12, 2012)
 
 *   nil is removed from array parameter values

@@ -1,3 +1,7 @@
+## Rails 3.1.7 (Jul 26, 2012)
+
+*   No changes.
+
 ## Rails 3.1.6 (Jun 12, 2012)
 
 *   protect against the nesting of hashes changing the
@@ -632,8 +636,6 @@
 
 
 ## Rails 3.0.0 (August 29, 2010) ##
-
-*   Changed update_attribute to not run callbacks and update the record directly in the database *Neeraj Singh*
 
 *   Add scoping and unscoped as the syntax to replace the old with_scope and with_exclusive_scope *José Valim*
 
