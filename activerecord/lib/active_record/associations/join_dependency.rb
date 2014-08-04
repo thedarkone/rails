@@ -33,16 +33,23 @@ module ActiveRecord
         @table_joins   = joins
         @join_parts    = [JoinBase.new(base)]
         @associations  = {}
+        @built_joins   = {}
         @reflections   = []
         @alias_tracker = AliasTracker.new(base.connection, joins)
         @alias_tracker.aliased_name_for(base.table_name) # Updates the count for base.table_name to 1
-        build(associations)
+
+        if associations.kind_of?(Array)
+          parent = default_parent
+          associations.each {|association| build(association, parent)}
+        else
+          build(associations)
+        end
       end
 
       def graft(*associations)
         associations.each do |association|
           join_associations.detect {|a| association == a} ||
-            build(association.reflection.name, association.find_parent_in(self) || join_base, association.join_type)
+            build(association.reflection.name, association.find_parent_in(self) || join_base, association.join_type, association)
         end
         self
       end
@@ -77,6 +84,10 @@ module ActiveRecord
 
         remove_duplicate_results!(base_klass, records, @associations)
         records
+      end
+
+      def join_associations_for(associations)
+        @built_joins[associations]
       end
 
       protected
@@ -125,8 +136,9 @@ module ActiveRecord
         ref[association.reflection.name] ||= {}
       end
 
-      def build(associations, parent = nil, join_type = Arel::InnerJoin)
-        parent ||= join_parts.last
+      def build(associations, parent = nil, join_type = Arel::InnerJoin, built_join_key = associations)
+        @accumulator ||= created_accumulator = []
+        parent ||= default_parent
         case associations
         when Symbol, String
           reflection = parent.reflections[associations.intern] or
@@ -137,6 +149,7 @@ module ActiveRecord
             join_association.join_type = join_type
             @join_parts << join_association
             cache_joined_association(join_association)
+            @accumulator << join_association
           end
           join_association
         when Array
@@ -151,6 +164,15 @@ module ActiveRecord
         else
           raise ConfigurationError, associations.inspect
         end
+      ensure
+        if created_accumulator
+          @built_joins[built_join_key] = @accumulator
+          @accumulator = nil
+        end
+      end
+
+      def default_parent
+        join_parts.last
       end
 
       def find_join_association(name_or_reflection, parent)

@@ -922,6 +922,7 @@ module ActiveRecord
     end
 
     def build_joins(manager, joins)
+      joins = joins.uniq
       buckets = joins.group_by do |join|
         case join
         when String
@@ -942,24 +943,35 @@ module ActiveRecord
       join_nodes                = (buckets[:join_node] || []).uniq
       string_joins              = (buckets[:string_join] || []).map { |x| x.strip }.uniq
 
-      join_list = join_nodes + custom_join_ast(manager, string_joins)
+      string_joins_as_ast = custom_join_ast(manager, string_joins)
 
       join_dependency = ActiveRecord::Associations::JoinDependency.new(
         @klass,
         association_joins,
-        join_list
+        join_nodes + string_joins_as_ast
       )
 
       join_dependency.graft(*stashed_association_joins)
 
       @implicit_readonly = true unless association_joins.empty? && stashed_association_joins.empty?
 
-      # FIXME: refactor this to build an AST
-      join_dependency.join_associations.each do |association|
-        association.join_to(manager)
+      joins.each do |join|
+        case join
+        when String
+          if string_join_as_ast = string_joins_as_ast.find {|string_join| string_join.left == join}
+            manager.join_sources << string_join_as_ast
+          end
+        when Hash, Symbol, Array, ActiveRecord::Associations::JoinDependency::JoinAssociation
+          if join_associations = join_dependency.join_associations_for(join)
+            # FIXME: refactor this to build an AST
+            join_associations.each do |association|
+              association.join_to(manager)
+            end
+          end
+        when Arel::Nodes::Join
+          manager.join_sources << join
+        end
       end
-
-      manager.join_sources.concat join_list
 
       manager
     end
